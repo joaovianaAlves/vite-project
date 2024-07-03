@@ -1,49 +1,64 @@
 import express from "express";
-import { initializeApp, applicationDefault, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-import { createRequire } from "module";
+import admin from "firebase-admin";
+import fs from "fs";
 
-const require = createRequire(import.meta.url);
-
-const serviceAccount = require("./serviceAccountKey.json");
-
-initializeApp({
-  credential: cert(serviceAccount),
-});
-
-const db = getFirestore();
 const app = express();
 const port = 3000;
 
-// Endpoint to handle short URL requests
+const serviceAccount = JSON.parse(
+  fs.readFileSync("./src/serviceAccountKey.json", "utf-8")
+);
+function generateShortCode() {
+  return Math.random().toString(36).substring(2, 8);
+}
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+const firestore = admin.firestore();
+
+app.post("/short", async (req, res) => {
+  try {
+    const longUrl = req.body.long;
+    const shortUrl = generateShortCode();
+
+    await firestore.collection("urls").add({
+      urlLong: longUrl,
+      urlShort: shortUrl,
+    });
+
+    res.json({ shortUrl });
+  } catch (error) {
+    console.error("Error creating short URL:", error);
+    res.status(500).send("Internal Server Error");
+  }
+});
+
 app.get("/:shortUrl", async (req, res) => {
-  const shortUrl = `https://short.ly/${req.params.shortUrl}`;
+  const { shortUrl } = req.params;
 
   try {
-    const snapshot = await db
+    const snapshot = await firestore
       .collection("urls")
       .where("urlShort", "==", shortUrl)
       .get();
 
     if (snapshot.empty) {
-      res.status(404).send("URL not found");
+      res.status(404).send("Not Found");
       return;
     }
 
-    const doc = snapshot.docs[0];
-    const longUrl = doc.data().urlLong;
-    res.redirect(longUrl);
+    snapshot.forEach((doc) => {
+      const { urlLong } = doc.data();
+      res.redirect(urlLong);
+    });
   } catch (error) {
-    console.error("Error getting document:", error);
-    res.status(500).send(`Internal Server Error: ${error.message}`);
+    console.error("Error retrieving long URL:", error);
+    res.status(500).send("Internal Server Error");
   }
 });
 
-// Start the server
-app.listen(port, (error) => {
-  if (error) {
-    console.error("Error starting server:", error);
-  } else {
-    console.log(`Server running on port ${port}`);
-  }
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
 });
