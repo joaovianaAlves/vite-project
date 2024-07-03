@@ -30,13 +30,12 @@ app.get("/:shortUrl", async (req, res) => {
       return;
     }
 
-    snapshot.forEach((doc) => {
-      const longUrl = doc.data().urlLong;
-      res.redirect(longUrl);
-    });
+    const doc = snapshot.docs[0];
+    const longUrl = doc.data().urlLong;
+    res.redirect(longUrl);
   } catch (error) {
     console.error("Error getting document:", error);
-    res.status(500).send("Internal Server Error");
+    res.status(500).send(`Internal Server Error: ${error.message}`);
   }
 });
 

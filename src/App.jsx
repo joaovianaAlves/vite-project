@@ -10,7 +10,7 @@ function App() {
   const ref = collection(firestore, "urls");
 
   function generateShortCode() {
-    return `https://short.ly/${Math.random().toString(36).substring(2, 6)}`;
+    return `${Math.random().toString(36).substring(2, 6)}`;
   }
 
   async function handleSubmit(event) {
